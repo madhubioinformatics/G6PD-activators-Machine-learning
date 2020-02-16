@@ -1,4 +1,5 @@
-Discovery of small molecule activators for G6PD (glucose-6-phosphate dehydrogenase) using machine learning approaches
+#Discovery of small molecule activators for G6PD (glucose-6-phosphate dehydrogenase) using machine learning approaches
+
 Glucose-6-Phosphate Dehydrogenase (G6PD) is a ubiquitous cytoplasmic enzyme converting glucose-6-phosphate into 6-phosphogluconate in the pentose phosphate pathway (PPP).
 The G6PD deficiency renders the inability to regenerate glutathione due to lack of NADPH and produces the oxidative injury in retina that accelerate the dystrophic 
 conditions to photoreceptor  cells and damage the retinal blood barrier function. In this study, we constructed pharmacophore-based models based on the compound complex 
