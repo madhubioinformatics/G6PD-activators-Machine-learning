@@ -1,0 +1,324 @@
+source("http://bioconductor.org/biocLite.R") # Sources the biocLite.R installation script.
+biocLite("ChemmineR") # Installs ChemmineR package.
+biocLite("ChemmineOB") # Installs ChemmineOB add-on package.
+install.packages("ChemmineR_x.x.x.zip", repos=NULL)
+## Load the package
+library("ChemmineR")
+
+## List all functions and classes available in the package:
+library(help="ChemmineR")
+
+## Open the vignette pdf (manual) of the package
+vignette("ChemmineR")
+## Import SD file and store as SDFset object
+
+sdfset <- read.SDFset("C:\Users\Hi\Desktop\G6PD\Protein\Ligand\docked\docked_final\53.sdf")
+data(sdfsample); sdfset <- sdfsample # The sample SDF set is provided by the library
+valid <- validSDF(sdfset); which(!valid) # Identifies invalid SDFs in SDFset objects.
+sdfset <- sdfset[valid] # Removes invalid SDFs, if there are any.
+
+## Import SD file and store as SDFstr object
+sdfstr <- read.SDFstr("http://faculty.ucr.edu/~tgirke/Documents/R_BioCond/Samples/sdfsample.sdf")
+
+## Create SDFset from SDFstr class
+read.SDFset(sdfstr)
+as(sdfstr, "SDFset")
+
+## Convert an SDFset container to a SMILES character string
+data(sdfsample); sdfset <- sdfsample[1]
+smiles <- sdf2smiles(sdfset)
+smiles
+## Inspecting content of SDF/SDFset objects
+view(sdfset[1:4]) # Summary view of several molecules in SDFset object
+length(sdfset) # Returns number of molecules stored in object
+sdfset[[1]] # Returns single molecule from SDFset as SDF object
+sdfset[[1]][[2]] # Returns atom block from first compound as matrix
+sdfset[[1]][[2]][1:4,] # Returns first four rows of atom block from first compound
+c(sdfset[1:4], sdfset[5:8]) # Concatenation of several SDFsets; is currently limited to two arguments!
+
+## String searching in SDFsets
+grepSDFset("650001", sdfset, field="datablock", mode="subset") # To return index, set mode="index")
+
+## Compound IDs
+sdfid(sdfset[1:4]) # Retrieves CMP IDs from Molecule Name field in header block.
+cid(sdfset[1:4]) # Retrieves CMP IDs from ID slot in SDFset.
+unique_ids <- makeUnique(sdfid(sdfset)) # Creates unique IDs by appending a counter to duplicates.
+cid(sdfset) <- unique_ids # Assigns uniquified IDs to ID slot
+
+## Subsetting by character, index and logical vectors
+view(sdfset[c("650001", "650012")])
+view(sdfset[4:1])
+mylog <- cid(sdfset) %in% c("650001", "650012"); view(sdfset[mylog])
+
+## Accessing SDF/SDFset components: header, atom, bond and data blocks
+atomblock(sdf); sdf[[2]]; sdf[["atomblock"]] # all three methods return the same component
+header(sdfset[1:4]); atomblock(sdfset[1:4]); bondblock(sdfset[1:4]); datablock(sdfset[1:4])
+header(sdfset[[1]]); atomblock(sdfset[[1]]); bondblock(sdfset[[1]]); datablock(sdfset[[1]])
+
+## Replacement Methods
+sdfset[[1]][[2]][1,1] <- 999
+atomblock(sdfset)[1] <- atomblock(sdfset)[2]
+datablock(sdfset)[1] <- datablock(sdfset)[2]
+
+## Assign matrix data to data block
+datablock(sdfset) <- as.matrix(iris[1:100,])
+view(sdfset[1:4])
+
+## Class Coercions
+## (a) From SDFstr to list, SDF and SDFset
+as(sdfstr[1:2], "list") 
+as(sdfstr[[1]], "SDF")
+as(sdfstr[1:2], "SDFset")
+
+## (b) From SDF to SDFstr, SDFset, list with SDF sub-components
+sdfcomplist <- as(sdf, "list")
+sdfcomplist <- as(sdfset[1:4], "list"); as(sdfcomplist[[1]], "SDF")
+sdflist <- as(sdfset[1:4], "SDF"); as(sdflist, "SDFset")
+as(sdfset[[1]], "SDFstr")
+as(sdfset[[1]], "SDFset")
+
+## (c) From SDFset to lists with components consisting of SDF or sub-components
+as(sdfset[1:4], "SDF")
+as(sdfset[1:4], "list")
+as(sdfset[1:4], "SDFstr")
+## Create atom frequency matrix
+propma <- atomcountMA(sdfset, addH=FALSE)
+boxplot(propma, main="Atom Frequency")
+boxplot(rowSums(propma), main="All Atom Frequency")  
+
+## Data frame provided by library containing atom names, atom symbols,
+## standard atomic weights and group/period numbers
+data(atomprop)
+atomprop[1:4,]
+
+  Number      Name Symbol Atomic_weight Group Period
+1      1  hydrogen      H      1.007940     1      1
+2      2    helium     He      4.002602    18      1
+3      3   lithium     Li      6.941000     1      2
+4      4 beryllium     Be      9.012182     2      2
+
+## Compute MW and formula
+MW(sdfset[1:4], addH=TRUE)
+
+    CMP1     CMP2     CMP3     CMP4
+456.4916 357.4069 370.4255 461.5346
+
+MF(sdfset[1:4], addH=TRUE)
+
+         CMP1          CMP2          CMP3          CMP4
+ "C23H28N4O6"  "C18H23N5O3" "C18H18N4O3S" "C21H27N5O5S"
+
+## Enumerate functional groups
+groups(sdfset[1:4], groups="fctgroup", type="countMA")
+
+     RNH2 R2NH R3N ROPO3 ROH RCHO RCOR RCOOH RCOOR ROR RCCH RCN
+CMP1    0    2   1     0   0    0    0     0     0   2    0   0
+CMP2    0    2   2     0   1    0    0     0     0   0    0   0
+CMP3    0    1   1     0   1    0    1     0     0   0    0   0
+CMP4    0    1   3     0   0    0    0     0     0   2    0   0
+
+## Combine MW, MF, charges, atom counts, functional group counts and ring counts in one data frame
+propma <- data.frame(MF=MF(sdfset, addH=FALSE), MW=MW(sdfset, addH=FALSE),
+                     Ncharges=sapply(bonds(sdfset, type="charge"), length),
+                     atomcountMA(sdfset, addH=FALSE),
+                     groups(sdfset, type="countMA"),
+                     rings(sdfset, upper=6, type="count", arom=TRUE))
+propma[1:4,]
+
+              MF       MW Ncharges  C  H N O S F Cl RNH2 R2NH R3N ROPO3 ROH RCHO RCOR RCOOH RCOOR ROR RCCH RCN RINGS AROMATIC
+CMP1  C23H28N4O6 456.4916        0 23 28 4 6 0 0  0    0    2   1     0   0    0    0     0     0   2    0   0     4        2
+CMP2  C18H23N5O3 357.4069        0 18 23 5 3 0 0  0    0    2   2     0   1    0    0     0     0   0    0   0     3        3
+CMP3 C18H18N4O3S 370.4255        0 18 18 4 3 1 0  0    0    1   1     0   1    0    1     0     0   0    0   0     4        2
+CMP4 C21H27N5O5S 461.5346        0 21 27 5 5 1 0  0    0    1   3     0   0    0    0     0     0   2    0   0     3        3
+
+## Assign properties to data block
+datablock(sdfset) <- propma # Works with all SDF components
+test <- apply(propma[1:4,], 1, function(x) data.frame(col=colnames(propma), value=x))
+sdf.visualize(sdfset[1:4], extra = test)
+
+## Extracting data block elements by tag name
+datablocktag(sdfset, tag="PUBCHEM_NIST_INCHI")
+datablocktag(sdfset, tag="PUBCHEM_OPENEYE_CAN_SMILES")
+
+## Convert entire data block to matrix
+blockmatrix <- datablock2ma(datablocklist=datablock(sdfset)) # Converts data block to matrix 
+numchar <- splitNumChar(blockmatrix=blockmatrix) # Splits matrix to numeric matrix and character matrix
+numchar[[1]][1:4,]; numchar[[2]][1:4,] # Splits matrix to numeric matrix and character matrix
+
+## Return ring information for one compound
+(ringatoms <- rings(sdfset[1], upper=Inf, type="all", arom=FALSE, inner=FALSE))
+$ring1
+[1] "N_10" "O_6"  "C_32" "C_31" "C_30"
+$ring2
+[1] "C_12" "C_14" "C_15" "C_13" "C_11"
+$ring3
+[1] "C_23" "O_2"  "C_27" "C_28" "O_3"  "C_25"
+$ring4
+[1] "C_23" "C_21" "C_18" "C_22" "C_26" "C_25"
+...
+## For visual inspection, the corresponding compound structure can be plotted with the ring bonds in color
+atomindex <- as.numeric(gsub(".*_", "", unique(unlist(ringatoms))))
+plot(sdfset[1], print=FALSE, colbonds=atomindex)
+## Alternatively, one can include the atom numbers in the plot
+plot(sdfset[1], print=FALSE, atomnum=TRUE, no_print_atoms="H")
+## Aromaticity information of rings can be returned in a logical vector by setting arom=TRUE
+rings(sdfset[1], upper=Inf, type="all", arom=TRUE, inner=FALSE)
+
+$RINGS
+$RINGS$ring1
+[1] "N_10" "O_6"  "C_32" "C_31" "C_30"
+
+$RINGS$ring2
+[1] "C_12" "C_14" "C_15" "C_13" "C_11"
+
+$RINGS$ring3
+[1] "C_23" "O_2"  "C_27" "C_28" "O_3"  "C_25"
+
+$RINGS$ring4
+[1] "C_23" "C_21" "C_18" "C_22" "C_26" "C_25"
+
+$RINGS$ring5
+ [1] "O_3"  "C_28" "C_27" "O_2"  "C_23" "C_21" "C_18" "C_22" "C_26" "C_25"
+
+
+$AROMATIC
+ring1 ring2 ring3 ring4 ring5
+ TRUE FALSE FALSE  TRUE FALSE
+
+## Return rings with no more than 6 atoms that are also aromatic
+rings(sdfset[1], upper=6, type="arom", arom=TRUE, inner=FALSE)
+
+$AROMATIC_RINGS
+$AROMATIC_RINGS$ring1
+[1] "N_10" "O_6"  "C_32" "C_31" "C_30"
+
+$AROMATIC_RINGS$ring4
+[1] "C_23" "C_21" "C_18" "C_22" "C_26" "C_25"
+
+## Count shortest possible rings and their aromaticity assignments by setting type=count and inner=TRUE. The inner (smallest possible) rings are identified by first computing all possible rings and then selecting only the inner rings. For more details, consult the help documentation with ?rings.
+rings(sdfset[1:4], upper=Inf, type="count", arom=TRUE, inner=TRUE)
+
+     RINGS AROMATIC
+CMP1     4        2
+CMP2     3        3
+CMP3     4        2
+CMP4     3        3
+
+## Samples of SDFset/SDF classes
+data(sdfsample)
+sdfset <- sdfsample[1:50]
+sdf <- sdfsample[[1]]
+    
+## Compute atom pair library
+ap <- sdf2ap(sdf)
+# apset <- sdf2ap(sdfset)
+data(apset)
+view(apset[1:4])
+    
+## Return main components of APset object
+cid(apset[1:4]) # Compound IDs
+ap(apset[1:4]) # Atom pair descriptors
+    
+## Return atom pairs in human readable format
+db.explain(apset[1])
+    
+## Coerce APset to other objects
+apset2descdb(apset) # Returns old list-style AP database
+tmp <- as(apset, "list") # Returns list
+as(tmp, "APset") # Converst list back to APset
+
+## Generate atom pair database directly from SD file
+## Note: this approach is less generic and may be discontinued in the future
+apold <- cmp.parse("http://faculty.ucr.edu/~tgirke/Documents/R_BioCond/Samples/sdfsample.sdf")
+
+## Construct APset class from apold
+aplist <- apold[[1]]; names(aplist) <- apold[[2]]
+apset <- as(aplist, "APset")
+view(apset[1:4])
+## Identify compounds with identical AP sets
+cmp.duplicated(apset, type=1) # Returns AP duplicate information in logical vector
+cmp.duplicated(apset, type=2) # Returns AP duplicate information as data frame
+
+## Remove AP duplicates from SDFset and APset objects
+apdups <- cmp.duplicated(apset, type=1)
+sdfset[which(!apdups)]; apset[which(!apdups)]
+table(datablocktag(sdfset, tag="PUBCHEM_NIST_INCHI")) # Enumerate identical InChI strings
+table(datablocktag(sdfset, tag="PUBCHEM_OPENEYE_CAN_SMILES")) # Enumerate identical SMILES strings
+table(datablocktag(sdfset, tag="PUBCHEM_MOLECULAR_FORMULA")) # Enumerate identical molecular formulas
+## Single-linkage binning clustering with multiple cutoffs of Tanimoto coefficient
+clusters <- cmp.cluster(apset, cutoff = c(0.7, 0.8, 0.9)) # Cutoffs can be changed under the 'cutoff' argument
+clusters[1:12,]
+
+      ids CLSZ_0.7 CLID_0.7 CLSZ_0.8 CLID_0.8 CLSZ_0.9 CLID_0.9
+48 650049        2       48        2       48        2       48
+49 650050        2       48        2       48        2       48
+54 650059        2       54        2       54        2       54
+55 650060        2       54        2       54        2       54
+56 650061        2       56        2       56        2       56
+57 650062        2       56        2       56        2       56
+58 650063        2       58        2       58        2       58
+59 650064        2       58        2       58        2       58
+60 650065        2       60        2       60        2       60
+61 650066        2       60        2       60        2       60
+1  650001        1        1        1        1        1        1
+2  650002        1        2        1        2        1        2
+
+## Clustering of 'FPset' objects with multiple cutoffs. This method allows to call various
+## similarity methods provided by the 'fpSim' function. For details consult '?fpSim'.
+fpset <- desc2fp(apset)
+clusters2 <- cmp.cluster(fpset, cutoff=c(0.5, 0.7, 0.9), method="Tanimoto") 
+clusters2[1:12,]
+
+      ids CLSZ_0.5 CLID_0.5 CLSZ_0.7 CLID_0.7 CLSZ_0.9 CLID_0.9
+69 650074       14       11        2       69        1       69
+79 650085       14       11        2       69        1       79
+11 650011       14       11        1       11        1       11
+15 650015       14       11        1       15        1       15
+45 650046       14       11        1       45        1       45
+47 650048       14       11        1       47        1       47
+51 650054       14       11        1       51        1       51
+53 650058       14       11        1       53        1       53
+64 650069       14       11        1       64        1       64
+65 650070       14       11        1       65        1       65
+67 650072       14       11        1       67        1       67
+86 650092       14       11        1       86        1       86
+
+
+## Sames as above, but using Tversky similarity measure
+clusters3 <- cmp.cluster(fpset, cutoff=c(0.5, 0.7, 0.9), method="Tversky", alpha=0.3, beta=0.7)
+
+## Return cluster size distributions for each cutoff
+cluster.sizestat(clusters, cluster.result=1)
+cluster.sizestat(clusters, cluster.result=2)
+cluster.sizestat(clusters, cluster.result=3)
+
+## Force calculation of distance matrix
+clusters <- cmp.cluster(db=apset, cutoff = c(0.65, 0.5, 0.3), save.distances="distmat.rda") # Saves distance matrix to file "distmat.rda" in current working directory.
+load("distmat.rda") # Loads distance matrix into workspace
+## MDS clustering and scatter plot
+cluster.visualize(apset, clusters, size.cutoff=2, quiet = TRUE) # Color codes clusters with at least two members.
+cluster.visualize(apset, clusters, size.cutoff=1, quiet = TRUE) # Plots all items
+
+# Create a 3D scatter plot of MDS result
+coord <- cluster.visualize(apset, clusters, size.cutoff=1, dimensions=3, quiet=TRUE)
+library(scatterplot3d)
+scatterplot3d(coord)
+
+# Interactive 3D scatter plot with Open GL
+# The rgl library needs to be installed for this.
+library(rgl)
+rgl.open(); offset <- 50; par3d(windowRect=c(offset, offset, 640+offset, 640+offset))
+rm(offset); rgl.clear(); rgl.viewpoint(theta=45, phi=30, fov=60, zoom=1)
+spheres3d(coord[,1], coord[,2], coord[,3], radius=0.03, color=coord[,4], alpha=1, shininess=20); aspect3d(1, 1, 1)
+axes3d(col='black'); title3d("", "", "", "", "", col='black'); bg3d("white") # To save a snapshot of the graph, one can use the command rgl.snapshot("test.png")
+## Plot dendrogram with heatmap (here similarity matrix)
+library(gplots)
+heatmap.2(1-distmat, Rowv=as.dendrogram(hc), Colv=as.dendrogram(hc), col=colorpanel(40, "darkblue", "yellow", "white"), density.info="none", trace="none")
+
+
+
+
+
+
+
+
